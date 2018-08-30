@@ -18,4 +18,4 @@
 # 如何让这个项目在机器上跑起来呢？
 为此，我们需要：
 - Windows 操作系统；
-- Visual Studio 2017（推荐[完全免费的 Community 版本！](https://visualstudio.microsoft.com/zh-hans/vs/community/)），并安装 ***.NET桌面开发*** 工作负载。
+- Visual Studio 2017（推荐[免费的 Community 版本](https://visualstudio.microsoft.com/zh-hans/vs/community/)），并安装 ***.NET桌面开发*** 工作负载。
