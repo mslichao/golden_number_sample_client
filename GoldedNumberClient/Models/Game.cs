@@ -118,7 +118,7 @@ namespace GoldedNumberClient.Models
         /// <returns>创建游戏的操作结果。</returns>
         public static async Task<GameOperation<CreateGameResult>> StartInNewRoomAsync(string userId = null)
         {
-            // 先创建新房间，再基于这个房间里，按正常流程启动游戏。
+            // 先创建新房间，再在这个房间里，按正常流程启动游戏。
             var newRoomOp = await OperationFromResponseAsync(
                 s_httpClient.GetAsync(NewRoomEndpoint),
                 JsonConvert.DeserializeObject<NewRoom>);
