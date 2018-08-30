@@ -70,10 +70,10 @@ namespace GoldedNumberClient.Models
         /// <summary>
         /// 开启一个新游戏。
         /// </summary>
-        /// <param name="roomIdToStart">这个游戏实例要连接到的房间号。可选，默认为0号房间。</param>
-        /// <param name="userId">参与这个游戏的玩家ID。可选，不提供的话会生成新ID。</param>
+        /// <param name="roomIdToStart">这个游戏实例要连接到的房间号。若为null或空，则为默认的0号房间。</param>
+        /// <param name="userId">参与这个游戏的玩家ID。若为null或空，会生成新ID。</param>
         /// <returns>创建游戏的操作结果。</returns>
-        public static async Task<GameOperation<CreateGameResult>> OpenRoomAsync(string roomIdToStart = null, string userId = null)
+        public static async Task<GameOperation<CreateGameResult>> OpenRoomAsync(string roomIdToStart, string userId)
         {
             // ConfigureAwait(false) 可以避免对特定的线程进行调度，比如只能序列化访问的UI线程。
             // 该函数内的操作都不需要 UI 线程。
@@ -85,9 +85,6 @@ namespace GoldedNumberClient.Models
             }
 
             var state = stateOp.OperationResult;
-
-            state.UserId = Guid.NewGuid().ToString();
-
             if (string.IsNullOrEmpty(state.UserId))
             {
                 // User ID 是必要的。
@@ -131,7 +128,7 @@ namespace GoldedNumberClient.Models
             }
 
             var newRoom = newRoomOp.OperationResult;
-            return await OpenRoomAsync(newRoom.RoomId);
+            return await OpenRoomAsync(roomIdToStart: newRoom.RoomId, userId: userId);
         }
 
         /// <summary>

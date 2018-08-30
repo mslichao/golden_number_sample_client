@@ -27,7 +27,7 @@ namespace GoldedNumberClient
             SetNicknameButton.Click += SetNicknameButton_Click;
 
             // 异步创建初始的 Game 对象，连接到默认的0号房间。如果初始化失败，该程序就退出。
-            HandleGameCreationAsync(Game.OpenRoomAsync()).ContinueWith(handle =>
+            HandleGameCreationAsync(Game.OpenRoomAsync(roomIdToStart: null, userId: null)).ContinueWith(handle =>
             {
                 // 需要在 UI 线程上执行。
                 Dispatcher.InvokeAsync(() =>
