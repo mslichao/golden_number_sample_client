@@ -233,7 +233,7 @@ namespace GoldedNumberClient.Models
                     while (countdown > 0)
                     {
                         // 这里异步地延迟 1s。稍有一些误差。
-                        await Task.Delay(1000).ConfigureAwait(false); // Each circle takes slightly more than 1s.
+                        await Task.Delay(1000).ConfigureAwait(false);
                         countdown--;
 
                         // 提示外部组件更新倒计时。
