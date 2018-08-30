@@ -182,11 +182,12 @@ namespace GoldedNumberClient
         {
             string msg = "";
 
-            do
+            do // 通过 do while (false) + break 的形式，在出错时跳转到最后，只进行错误提示。
             {
                 if (!double.TryParse(NumberInputTextBox.Text, out double candidate))
                 {
                     msg = $"Input must be number! {NumberInputTextBox.Text}";
+                    break;
                 }
 
                 double? candidate2 = null;
@@ -199,6 +200,7 @@ namespace GoldedNumberClient
                     else
                     {
                         msg = $"Secondary input must be number! {Number2InputTextBox.Text}";
+                        break;
                     }
                 }
 
@@ -219,6 +221,7 @@ namespace GoldedNumberClient
                 else
                 {
                     msg = $"Failed to submit: {result.ErrorMessage}";
+                    break;
                 }
             } while (false);
 
