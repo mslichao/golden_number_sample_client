@@ -109,7 +109,7 @@ namespace GoldedNumberClient
 
             bool twoNumbers = creation.Game.NumberMode == RoomNumberMode.Two;
             Number2InputTextBox.Visibility = twoNumbers ? Visibility.Visible : Visibility.Collapsed;
-            NumberInputTextBox.Width = twoNumbers ? 50 : 100;
+            NumberInputTextBox.Width = twoNumbers ? 40 : 100;
 
             var nickname = creation.Game.Nickname;
             if (nickname != null)

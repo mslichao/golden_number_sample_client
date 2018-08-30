@@ -168,6 +168,7 @@ namespace GoldedNumberClient.Models
         /// 检查并提交这一轮的黄金点。
         /// </summary>
         /// <param name="candidate">要提交的数。</param>
+        /// <param name="candidate2">要提交的第二个数。在不支持两个数的游戏里，必须是null。</param>
         /// <returns>提交黄金点的操作结果。</returns>
         public async Task<GameOperation<bool>> SubmitAsync(double candidate, double? candidate2)
         {
@@ -198,7 +199,7 @@ namespace GoldedNumberClient.Models
                 Uri.EscapeDataString(UserId),
                 Uri.EscapeDataString(roundId),
                 Uri.EscapeDataString(candidate.ToString()),
-                Uri.EscapeDataString(candidate2?.ToString() ?? ""));
+                Uri.EscapeDataString(candidate2?.ToString() ?? "")); // 如果游戏模式不是提交两个数，就将第二个数对应的参数设为空。
 
             var dummyBody = new StringContent("");
             return await OperationFromResponseAsync(

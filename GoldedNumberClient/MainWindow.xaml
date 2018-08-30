@@ -64,7 +64,7 @@
                                 Orientation="Horizontal">
                         <TextBox x:Name="NumberInputTextBox" Width="100" />
                         <TextBox x:Name="Number2InputTextBox"
-                                 Width="50"
+                                 Width="40"
                                  Visibility="Collapsed" />
                         <Button x:Name="SubmitButton">Submit!</Button>
                     </StackPanel>
