@@ -21,11 +21,17 @@ namespace GoldedNumberClient.Models
 
         //TODO 使用分页获取历史的接口。
         private const string HistoryEndpointTemplate = GameEndpointBase + "history?roomid={0}";
-        private const string SubmitEndpointTemplate = GameEndpointBase + "submit?uid={0}&rid={1}&n1={2}";
+        private const string SubmitEndpointTemplate = GameEndpointBase + "submit?uid={0}&rid={1}&n1={2}&n2={3}";
 
-        // 总是“人类玩家”模式，提交一个数，一轮60s。
-        private const string NewRoomEndpoint = GameEndpointBase + "newroom";
+        // 总是“人类玩家”模式，一轮60s。
+        private const string NewRoomEndpointTemplate = GameEndpointBase + "newroom?numbers={0}";
         private const string NicknameEndpointTemplate = GameEndpointBase + "nickname?uid={0}&nickname={1}";
+
+        private static readonly Dictionary<RoomNumberMode, string> SupportedNumberModes = new Dictionary<RoomNumberMode, string>
+        {
+            [RoomNumberMode.One] = "1",
+            [RoomNumberMode.Two] = "2",
+        };
 
         // HttpClient 的方法全都是线程安全的，可以通过静态实例复用。
         private static readonly HttpClient s_httpClient = new HttpClient();
@@ -44,6 +50,8 @@ namespace GoldedNumberClient.Models
         /// 当前进行游戏的玩家的昵称。
         /// </summary>
         public string Nickname { get; private set; }
+
+        public RoomNumberMode NumberMode { get; private set; }
 
         /// <summary>
         /// 每当我们觉得合适更新倒计时的显示了，这个事件就触发。
@@ -91,19 +99,20 @@ namespace GoldedNumberClient.Models
                 return GameOperation<CreateGameResult>.Fail("No valid User ID.");
             }
 
-            var game = new Game
-            {
-                UserId = state.UserId,
-                RoomId = state.RoomId,
-                Nickname = state.NickName,
-            };
-
             var mode = ConvertNumberMode(state.Numbers);
             if (mode == RoomNumberMode.Unknown)
             {
                 // 不支持的游戏模式。
                 return GameOperation<CreateGameResult>.Fail($"Unsupported number mode {mode}.");
             }
+
+            var game = new Game
+            {
+                UserId = state.UserId,
+                RoomId = state.RoomId,
+                Nickname = state.NickName,
+                NumberMode = mode,
+            };
 
             // 启动游戏主循环，用于倒计时和推进游戏轮数。
             // 由于我们用 async/await的形式包装了主循环，故其返回 Task。不过我们不需要用这个 Task。
@@ -114,14 +123,19 @@ namespace GoldedNumberClient.Models
         /// <summary>
         /// 创建一个新的游戏房间，并在其中开启新游戏。
         /// </summary>
+        /// <param name="mode"></param>
         /// <param name="userId">可选。要继承的玩家ID。</param>
         /// <returns>创建游戏的操作结果。</returns>
-        public static async Task<GameOperation<CreateGameResult>> StartInNewRoomAsync(string userId = null)
+        public static async Task<GameOperation<CreateGameResult>> StartInNewRoomAsync(RoomNumberMode mode, string userId = null)
         {
+            if (!SupportedNumberModes.ContainsKey(mode))
+            {
+                throw new ArgumentOutOfRangeException(nameof(mode));
+            }
+
             // 先创建新房间，再在这个房间里，按正常流程启动游戏。
-            var newRoomOp = await OperationFromResponseAsync(
-                s_httpClient.GetAsync(NewRoomEndpoint),
-                JsonConvert.DeserializeObject<NewRoom>);
+            var url = string.Format(NewRoomEndpointTemplate, SupportedNumberModes[mode]);
+            var newRoomOp = await OperationFromResponseAsync(s_httpClient.GetAsync(url), JsonConvert.DeserializeObject<NewRoom>);
             if (!newRoomOp.Succeeded)
             {
                 return GameOperation<CreateGameResult>.Fail(newRoomOp.ErrorMessage);
@@ -151,7 +165,7 @@ namespace GoldedNumberClient.Models
         /// </summary>
         /// <param name="candidate">要提交的数。</param>
         /// <returns>提交黄金点的操作结果。</returns>
-        public async Task<GameOperation<bool>> SubmitAsync(double candidate)
+        public async Task<GameOperation<bool>> SubmitAsync(double candidate, double? candidate2)
         {
             EnsureGameNotClosed();
 
@@ -162,11 +176,25 @@ namespace GoldedNumberClient.Models
                 return GameOperation<bool>.Fail("Input must be in (0, 100)");
             }
 
+            if (candidate2.HasValue)
+            {
+                if (NumberMode != RoomNumberMode.Two)
+                {
+                    return GameOperation<bool>.Fail("Not 2-number room.");
+                }
+
+                if (!(0 < candidate2 && candidate2 < 100))
+                {
+                    return GameOperation<bool>.Fail("Secondary input must be in (0, 100)");
+                }
+            }
+
             string submitUrl = string.Format(
                 SubmitEndpointTemplate,
                 Uri.EscapeDataString(UserId),
                 Uri.EscapeDataString(roundId),
-                Uri.EscapeDataString(candidate.ToString()));
+                Uri.EscapeDataString(candidate.ToString()),
+                Uri.EscapeDataString(candidate2?.ToString() ?? ""));
 
             var dummyBody = new StringContent("");
             return await OperationFromResponseAsync(
@@ -379,11 +407,10 @@ namespace GoldedNumberClient.Models
             return GameOperation<T>.Fail(msg);
         }
 
-        // 目前只支持提交一个黄金点的游戏模式。
         private static RoomNumberMode ConvertNumberMode(string mode)
         {
-            // TODO support more modes.
-            return mode == "1" ? RoomNumberMode.One : RoomNumberMode.Unknown;
+            // 没有找到的话，FirstOrDefault 中的 default 将是 RoomNumberMode.Unknown。
+            return SupportedNumberModes.FirstOrDefault(kv => kv.Value == mode).Key;
         }
 
         private static Round ConvertStateToNewRound(State state)
