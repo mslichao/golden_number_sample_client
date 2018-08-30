@@ -1,0 +1,291 @@
+﻿using GoldedNumberClient.Models;
+using GoldedNumberClient.Utils;
+using System;
+using System.Linq;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Threading;
+
+namespace GoldedNumberClient
+{
+    /// <summary>
+    /// MainWindow.xaml 的交互逻辑
+    /// </summary>
+    public partial class MainWindow : Window
+    {
+        public MainWindow()
+        {
+            InitializeComponent();
+
+            LogTextBox.TextChanged += Log_TextChanged;
+            SubmitButton.Click += Submit_Click;
+
+            NewRoomButton.Click += NewRoomButton_Click;
+            SwitchRoomButton.Click += SwitchRoomButton_Click;
+
+            SetNicknameButton.Click += SetNicknameButton_Click;
+
+            // 异步创建初始的 Game 对象，连接到默认的0号房间。如果初始化失败，该程序就退出。
+            HandleGameCreationAsync(Game.OpenRoomAsync()).ContinueWith(handle =>
+            {
+                // 需要在 UI 线程上执行。
+                Dispatcher.InvokeAsync(() =>
+                {
+                    if (handle.Status != TaskStatus.RanToCompletion || !handle.Result.Succeeded)
+                    {
+                        string msg = "";
+                        if (handle.Status != TaskStatus.RanToCompletion)
+                        {
+                            // 因为异步执行出错了。如未捕获的异常。
+                            // 先看看异常是不是 AggregateException，是的话就取其 InnerException 的错误信息，否则就直接取异常的错误信息。
+                            msg = ((handle.Exception as AggregateException)?.InnerException ?? handle.Exception).Message;
+                        }
+                        else
+                        {
+                            // 某个 GameOperation 报告了错误……
+                            msg = handle.Result.ErrorMessage;
+                        }
+
+                        MessageBox.Show(
+                            "Game failed to start! Try restart this app. " + msg,
+                            "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                        Application.Current.Shutdown();
+                        return;
+                    }
+                });
+            });
+        }
+
+        /// <summary>
+        /// 当前进行中的游戏对象。
+        /// </summary>
+        private Game _game;
+
+        /// <summary>
+        /// 提取出 <see cref="Game">对象创建（加入房间或创建新房间）成功后需要执行的操作。创建成功的话就初始化界面。
+        /// 并将创建结果向后传递，以方便 <see cref="Game"/>的调用逻辑进行后续处理。
+        /// </summary>
+        /// <param name="creationTask">异步的游戏创建操作。</param>
+        /// <returns>游戏创建操作的结果。</returns>
+        private async Task<GameOperation<CreateGameResult>> HandleGameCreationAsync(Task<GameOperation<CreateGameResult>> creationTask)
+        {
+            Dispatcher.VerifyAccess(); // We has reached UI thread.
+
+            var creation = await creationTask;
+            if (creation.Succeeded)
+            {
+                OnGameCreationSucceeded(creation.OperationResult);
+            }
+
+            return creation;
+        }
+
+        /// <summary>
+        /// <see cref="Game"/>对象创建成功后，进行初始化或修改界面的操作。
+        /// </summary>
+        /// <param name="creation">游戏创建操作的结果。</param>
+        private async void OnGameCreationSucceeded(CreateGameResult creation)
+        {
+            // 如果有在进行游戏，需要关闭它。以防止其继续推送游戏事件或造成对象泄漏。
+            _game?.Close();
+            _game = creation.Game;
+
+            // Game 类的事件不一定在 UI 线程触发，我们需要包装所有涉及 UI 的操作，都在UI线程进行。
+            // PostAsync 会将操作转移到 UI 线程执行。
+            _game.CountdownTicked += (g, cd) => PostAsync(() => UpdateCountdown(cd.Seconds));
+            _game.NewRoundEntered += (g, a) => PostAsync(() => OnNewRound(g, a));
+            _game.ErrorOccurred += (g, s) => PostAsync(() => WriteLog(s + " Please restart game."));
+
+            // 将界面调整到运行状态。
+            MainGrid.IsEnabled = true;
+            Blocker.Visibility = Visibility.Collapsed;
+            WriteLog($"====== Entered room {creation.Game.RoomId} ======");
+            WriteLog($"Current user ID: {_game.UserId}");
+            WriteLog($"Current round: {creation.InitialRound.RoundId}");
+            UpdateCountdown(creation.InitialCountdown.Seconds);
+
+            var nickname = creation.Game.Nickname;
+            if (nickname != null)
+            {
+                NicknameTextBox.Text = nickname;
+            }
+
+            await ShowHistoryAsync();
+        }
+
+        private async void OnNewRound(Game game, Round arg)
+        {
+            // 判断是不是当前正在进行的游戏。以防止在 PostAsync 将消息发送到 UI 线程过程中导致历史重载。
+            if (game == _game)
+            {
+                WriteLog($"New round: {arg.RoundId}");
+                await ShowHistoryAsync();
+            }
+        }
+
+        // 在表格上显示各种历史分数。
+        private async Task ShowHistoryAsync()
+        {
+            HistoryMask.Visibility = Visibility.Visible;
+            var historyOp = await _game.GetHistoryAsync();
+
+            if (historyOp.Succeeded)
+            {
+                var history = historyOp.OperationResult;
+
+                // 这里的 ? 操作符可以在前方的变量为 null 时，跳过后续的流程，防止产生 NullReferenceException。
+                HistoryView.ItemsSource = history.Rounds?.Select(round => new
+                {
+                    // 这些匿名对象的字段名，需要和 XAML 文件中设定的数据绑定保持一致。
+                    Time = $"{round.Time:MM/dd HH:mm:ss}",
+                    GoldenNumber = round.GoldenNumber
+                });
+
+                // 最多显示五轮的结果。
+                LastRoundScoreView.ItemsSource = history.Rounds?.Take(5).SelectMany(round => round?.UserNumbers?.Select(num => new
+                {
+                    RoundTime = $"{round.Time:MM/dd HH:mm:ss}",
+                    Nickname = history.NickNames[num.UserId],
+                    UserId = num.UserId,
+                    Number = num.MasterNumber,
+                    Score = num.Score,
+                }));
+
+                HistoryMask.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void UpdateCountdown(int second)
+        {
+            CountdownLabel.Text = $"{second}s";
+        }
+
+        /// <summary>
+        /// 确保操作在 UI 线程执行。
+        /// </summary>
+        /// <param name="action">要执行的操作。</param>
+        /// <returns>调度的结果。</returns>
+        private DispatcherOperation PostAsync(Action action)
+        {
+            return Dispatcher.InvokeAsync(action);
+        }
+
+        private async void Submit_Click(object sender, RoutedEventArgs e)
+        {
+            string msg = "";
+            if (double.TryParse(NumberInputTextBox.Text, out double candidate))
+            {
+                var result = await _game.SubmitAsync(candidate);
+                if (result.Succeeded)
+                {
+                    WriteLog($"Submitted {candidate}.");
+                    NumberInputTextBox.Text = "";
+                    return;
+                }
+                else
+                {
+                    msg = $"Failed to submit: {result.ErrorMessage}";
+                }
+
+            }
+            else
+            {
+                msg = $"Input must be number! {NumberInputTextBox.Text}";
+            }
+
+            MessageBox.Show(msg, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        private async void SwitchRoomButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (RoomIdTextBox.Text == _game.RoomId)
+            {
+                MessageBox.Show($"You are already in room {_game.RoomId}!", "Switch stopped");
+                return;
+            }
+
+            if (!string.IsNullOrEmpty(RoomIdTextBox.Text))
+            {
+                string msg = "";
+                bool failed = true;
+                try
+                {
+                    // 切换房间可能因为房间不存在而失败。我们不为这种失败结束程序。
+                    var op = await HandleGameCreationAsync(Game.OpenRoomAsync(RoomIdTextBox.Text, _game.UserId));
+                    failed = !op.Succeeded;
+                    if (failed)
+                    {
+                        msg = op.ErrorMessage;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    msg = ((ex as AggregateException)?.InnerException ?? ex).Message;
+                }
+
+                if (failed)
+                {
+                    MessageBox.Show(
+                        "Failed to switch room! " + msg,
+                        "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
+
+            RoomIdTextBox.Text = "";
+        }
+
+        private async void NewRoomButton_Click(object sender, RoutedEventArgs e)
+        {
+            await HandleGameCreationAsync(Game.StartInNewRoomAsync(_game.UserId));
+        }
+
+        private async void SetNicknameButton_Click(object sender, RoutedEventArgs e)
+        {
+            var operation = await _game.ChangeNicknameAsync(NicknameTextBox.Text);
+            if (operation.Succeeded)
+            {
+                WriteLog($"Nickname changed to {NicknameTextBox.Text}");
+            }
+            else
+            {
+                WriteLog($"Failed to change nickname: {operation.ErrorMessage}");
+            }
+        }
+
+        private void Log_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            LogTextBox.ScrollToEnd();
+        }
+
+        private void WriteLog(string log)
+        {
+            if (!log.EndsWith("\n"))
+            {
+                log += '\n';
+            }
+
+            log = $"[{DateTime.Now:HH:mm:ss}] {log}";
+
+            int newLineCount = log.Count(c => c == '\n');
+            string existingLog = LogTextBox.Text;
+
+            int toLineCount = newLineCount + LogTextBox.LineCount;
+            if (toLineCount > LogTextBox.MaxLines)
+            {
+                int startIdx = 0;
+                for (int i = 0; i < 10; i++)
+                {
+                    // Line count to remove should be lesser than `MaxLines`.
+                    // Even if \n is not found, `IndexOf` returns -1, so `startIdx` becomes 0, that's good.
+                    startIdx = existingLog.IndexOf('\n', startIdx) + 1;
+                }
+
+                existingLog = existingLog.Substring(startIdx);
+            }
+
+            existingLog += log;
+            LogTextBox.Text = existingLog;
+        }
+    }
+}
