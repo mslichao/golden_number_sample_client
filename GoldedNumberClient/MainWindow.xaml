@@ -63,7 +63,9 @@
                                 utils:AllChildren.Margin="8,0,0,0"
                                 Orientation="Horizontal">
                         <TextBox x:Name="NumberInputTextBox" Width="100" />
-                        <TextBox x:Name="Number2InputTextBox" Width="50" Visibility="Collapsed" />
+                        <TextBox x:Name="Number2InputTextBox"
+                                 Width="50"
+                                 Visibility="Collapsed" />
                         <Button x:Name="SubmitButton">Submit!</Button>
                     </StackPanel>
 
@@ -78,8 +80,9 @@
 
                     <TextBlock Grid.Row="2" HorizontalAlignment="Right">Or create new room:</TextBlock>
                     <StackPanel Grid.Row="2"
-                                Grid.Column="1" Orientation="Horizontal"
-                                utils:AllChildren.Margin="8,0,0,8">
+                                Grid.Column="1"
+                                utils:AllChildren.Margin="8,0,0,8"
+                                Orientation="Horizontal">
                         <Button x:Name="NewRoomButton"
                                 Padding="8,0,8,0"
                                 Content="1-number" />
