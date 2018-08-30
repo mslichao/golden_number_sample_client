@@ -27,6 +27,7 @@ namespace GoldedNumberClient.Models
         private const string NewRoomEndpointTemplate = GameEndpointBase + "newroom?numbers={0}";
         private const string NicknameEndpointTemplate = GameEndpointBase + "nickname?uid={0}&nickname={1}";
 
+        // 当前设计下支持的数字模式。只支持提交一个或两个数字。
         private static readonly Dictionary<RoomNumberMode, string> SupportedNumberModes = new Dictionary<RoomNumberMode, string>
         {
             [RoomNumberMode.One] = "1",
@@ -51,6 +52,9 @@ namespace GoldedNumberClient.Models
         /// </summary>
         public string Nickname { get; private set; }
 
+        /// <summary>
+        /// 当前游戏支持提交的数字个数。
+        /// </summary>
         public RoomNumberMode NumberMode { get; private set; }
 
         /// <summary>
