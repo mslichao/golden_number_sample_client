@@ -63,6 +63,9 @@
                                 utils:AllChildren.Margin="8,0,0,0"
                                 Orientation="Horizontal">
                         <TextBox x:Name="NumberInputTextBox" Width="100" />
+                        <TextBox x:Name="Number2InputTextBox"
+                                 Width="40"
+                                 Visibility="Collapsed" />
                         <Button x:Name="SubmitButton">Submit!</Button>
                     </StackPanel>
 
@@ -75,13 +78,19 @@
                         <Button x:Name="SwitchRoomButton">Switch</Button>
                     </StackPanel>
 
-                    <TextBlock Grid.Row="2" HorizontalAlignment="Right">Or</TextBlock>
-                    <Button x:Name="NewRoomButton"
-                            Grid.Row="2"
-                            Grid.Column="1"
-                            Margin="8,0,0,8"
-                            Padding="8,0,8,0"
-                            Content="Create New Room!" />
+                    <TextBlock Grid.Row="2" HorizontalAlignment="Right">Or create new room:</TextBlock>
+                    <StackPanel Grid.Row="2"
+                                Grid.Column="1"
+                                utils:AllChildren.Margin="8,0,0,8"
+                                Orientation="Horizontal">
+                        <Button x:Name="NewRoomButton"
+                                Padding="8,0,8,0"
+                                Content="1-number" />
+                        <Button x:Name="NewTwoNumberRoomButton"
+                                Padding="8,0,8,0"
+                                Content="2-number" />
+                    </StackPanel>
+
 
                     <TextBlock Grid.Row="3">Change nickname:</TextBlock>
                     <StackPanel Grid.Row="3"
@@ -116,7 +125,8 @@
                                 <GridViewColumn DisplayMemberBinding="{Binding RoundTime}" Header="Round Time" />
                                 <GridViewColumn DisplayMemberBinding="{Binding Nickname}" Header="Nickname" />
                                 <GridViewColumn DisplayMemberBinding="{Binding UserId}" Header="User ID" />
-                                <GridViewColumn DisplayMemberBinding="{Binding Number}" Header="Number" />
+                                <GridViewColumn DisplayMemberBinding="{Binding Number1}" Header="Number 1" />
+                                <GridViewColumn DisplayMemberBinding="{Binding Number2}" Header="Number 2" />
                                 <GridViewColumn DisplayMemberBinding="{Binding Score}" Header="Score" />
                             </GridView>
                         </ListView.View>

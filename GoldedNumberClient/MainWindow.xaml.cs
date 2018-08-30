@@ -21,8 +21,9 @@ namespace GoldedNumberClient
             LogTextBox.TextChanged += Log_TextChanged;
             SubmitButton.Click += Submit_Click;
 
-            NewRoomButton.Click += NewRoomButton_Click;
             SwitchRoomButton.Click += SwitchRoomButton_Click;
+            NewRoomButton.Click += NewRoomButton_Click;
+            NewTwoNumberRoomButton.Click += NewTwoNumberRoomButton_Click;
 
             SetNicknameButton.Click += SetNicknameButton_Click;
 
@@ -56,6 +57,7 @@ namespace GoldedNumberClient
                 });
             });
         }
+
 
         /// <summary>
         /// 当前进行中的游戏对象。
@@ -100,10 +102,14 @@ namespace GoldedNumberClient
             // 将界面调整到运行状态。
             MainGrid.IsEnabled = true;
             Blocker.Visibility = Visibility.Collapsed;
-            WriteLog($"====== Entered room {creation.Game.RoomId} ======");
+            WriteLog($"=== Entered room {creation.Game.RoomId} ({creation.Game.NumberMode}-number) ===");
             WriteLog($"Current user ID: {_game.UserId}");
             WriteLog($"Current round: {creation.InitialRound.RoundId}");
             UpdateCountdown(creation.InitialCountdown.Seconds);
+
+            bool twoNumbers = creation.Game.NumberMode == RoomNumberMode.Two;
+            Number2InputTextBox.Visibility = twoNumbers ? Visibility.Visible : Visibility.Collapsed;
+            NumberInputTextBox.Width = twoNumbers ? 40 : 100;
 
             var nickname = creation.Game.Nickname;
             if (nickname != null)
@@ -148,7 +154,8 @@ namespace GoldedNumberClient
                     RoundTime = $"{round.Time:MM/dd HH:mm:ss}",
                     Nickname = history.NickNames[num.UserId],
                     UserId = num.UserId,
-                    Number = num.MasterNumber,
+                    Number1 = num.MasterNumber,
+                    Number2 = num.SlaveNumber,
                     Score = num.Score,
                 }));
 
@@ -174,25 +181,49 @@ namespace GoldedNumberClient
         private async void Submit_Click(object sender, RoutedEventArgs e)
         {
             string msg = "";
-            if (double.TryParse(NumberInputTextBox.Text, out double candidate))
+
+            do // 通过 do while (false) + break 的形式，在出错时跳转到最后，只进行错误提示。
             {
-                var result = await _game.SubmitAsync(candidate);
+                if (!double.TryParse(NumberInputTextBox.Text, out double candidate))
+                {
+                    msg = $"Input must be number! {NumberInputTextBox.Text}";
+                    break;
+                }
+
+                double? candidate2 = null;
+                if (_game.NumberMode == RoomNumberMode.Two)
+                {
+                    if (double.TryParse(Number2InputTextBox.Text, out double n2))
+                    {
+                        candidate2 = n2;
+                    }
+                    else
+                    {
+                        msg = $"Secondary input must be number! {Number2InputTextBox.Text}";
+                        break;
+                    }
+                }
+
+                var result = await _game.SubmitAsync(candidate, candidate2);
                 if (result.Succeeded)
                 {
-                    WriteLog($"Submitted {candidate}.");
+                    string submitted = $"Submitted {candidate}";
+                    if (candidate2.HasValue)
+                    {
+                        submitted += $" and {candidate2.Value}";
+                    }
+
+                    WriteLog(submitted);
                     NumberInputTextBox.Text = "";
+                    Number2InputTextBox.Text = "";
                     return;
                 }
                 else
                 {
                     msg = $"Failed to submit: {result.ErrorMessage}";
+                    break;
                 }
-
-            }
-            else
-            {
-                msg = $"Input must be number! {NumberInputTextBox.Text}";
-            }
+            } while (false);
 
             MessageBox.Show(msg, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -237,7 +268,12 @@ namespace GoldedNumberClient
 
         private async void NewRoomButton_Click(object sender, RoutedEventArgs e)
         {
-            await HandleGameCreationAsync(Game.StartInNewRoomAsync(_game.UserId));
+            await HandleGameCreationAsync(Game.StartInNewRoomAsync(RoomNumberMode.One, _game.UserId));
+        }
+
+        private async void NewTwoNumberRoomButton_Click(object sender, RoutedEventArgs e)
+        {
+            await HandleGameCreationAsync(Game.StartInNewRoomAsync(RoomNumberMode.Two, _game.UserId));
         }
 
         private async void SetNicknameButton_Click(object sender, RoutedEventArgs e)
