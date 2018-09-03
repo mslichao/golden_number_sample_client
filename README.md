@@ -25,3 +25,5 @@ N个玩家，每人写一个或两个0~100之间的有理数 (不包括0或100)�
 为此，我们需要：
 - Windows 操作系统；
 - Visual Studio 2017（推荐[免费的 Community 版本](https://visualstudio.microsoft.com/zh-hans/vs/community/)），并安装 ***.NET桌面开发*** 工作负载。
+
+aaaaaa
